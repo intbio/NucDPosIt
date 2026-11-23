@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 import warnings
+import pandas as pd
 
 
 # from fiber_graph import FiberGraph
@@ -13,7 +14,7 @@ class NucleosomeContainer:
 class Nucleosome:
     def __init__(self, dyad, right, left, count=1):
         self.dyad = self._validate_dyad(dyad)
-        self.right, self.left = self._validate_cords(left, right)
+        self.left, self.right = self._validate_cords(left, right)
         self.count = count
 
     def _validate_dyad(self, dyad):
@@ -157,6 +158,26 @@ class NucleosomeContainer:
                 if pos not in self._by_position:
                     self._by_position[pos] = []
                 self._by_position[pos].append(nuc)
+
+    def build_occupancy(self, min_pos=None, max_pos=None, pad=0):
+        min_pos = (
+            min(nuc.left for nuc in self.nucleosomes) if not min_pos else min_pos
+        ) - pad
+        max_pos = (
+            max(nuc.right for nuc in self._nucleosomes) if not max_pos else max_pos
+        ) + pad
+    
+        assert min_pos < max_pos, "positioin error"
+    
+        # Создаем массив покрытия
+        occupancy = {pos: 0 for pos in range(min_pos, max_pos + 1)}
+    
+        # Для каждой нуклеосомы увеличиваем счетчик на её позициях
+        for nuc in self._nucleosomes:
+            for pos in range(nuc.left, nuc.right + 1):
+                occupancy[pos] += nuc.count
+    
+        return occupancy
     
     def connectivity_graph(self, min_dist=140, max_dist=300):
         assert min_dist < max_dist
@@ -207,10 +228,61 @@ class NucleosomeContainer:
                     if cur_dist >= min_dist and cur_dist <= max_dist:
                         G.add_edge(link_node, root_pos)
         return G, roots, leaves
-                    
+    
+    def to_df(self, dyad_as_index=False):
+        """
+        Вернуть нуклеосомы как pandas.DataFrame.
+    
+        Колонки:
+            dyad   : позиция диad
+            left   : левая граница (1-based, inclusive)
+            right  : правая граница (1-based, inclusive)
+            length : right - left + 1
+            count  : вес нуклеосомы
+        """
+        rows = [
+            {
+                "dyad":   nuc.dyad,
+                "left":   nuc.left,
+                "right":  nuc.right,
+                "length": nuc.right - nuc.left + 1,
+                "count":  nuc.count,
+            }
+            for nuc in self._nucleosomes
+        ]
+        df = pd.DataFrame(rows, columns=["dyad", "left", "right", "length", "count"])
+        if dyad_as_index:
+            df = df.set_index("dyad")
+        return df
 
-        
-        
+    def to_bed(self, path=None, chrom="chr1", score_field="count", name_prefix="nuc"):
+        """
+        Сохранить нуклеосомы в BED (0-based, half-open).
+        Колонки: chrom, start, end, name, score, strand, dyad
+        """
+        lines = []
+        for i, nuc in enumerate(self._nucleosomes):
+            start0 = nuc.left - 1          # 1-based inclusive -> 0-based half-open
+            end0   = nuc.right             # end уже "следующий за последним" в 0-based
+            name   = f"{name_prefix}_{i}"
+            if score_field == "count":
+                score = int(nuc.count)
+            elif score_field == "length":
+                score = int(nuc.right - nuc.left + 1)
+            else:
+                raise ValueError(f"unknown score_field: {score_field}")
+            # BED score традиционно 0..1000; обрезаем, чтобы не ломать парсеры
+            score = max(0, min(1000, score))
+            lines.append(
+                f"{chrom}\t{start0}\t{end0}\t{name}\t{score}\t.\t{nuc.dyad}"
+            )
+    
+        text = "\n".join(lines) + "\n"
+        if path is None:
+            return text
+        with open(path, "w") as f:
+            f.write(text)
+        return path
 
 
 

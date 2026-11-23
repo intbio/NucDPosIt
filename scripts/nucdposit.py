@@ -7,6 +7,7 @@ import pprint
 import pandas as pd
 import EMmodel.datasets as datasets
 from EMmodel import em_model
+from em_model import ErrorsProbs
 
 
 def parse_args():
@@ -17,6 +18,8 @@ def parse_args():
                         help='Path to file with specified regions to analyse')
     parser.add_argument('errorpath', type=str,
                         help='Path to error file')
+    parser.add_argument('lamb', type=float,
+                        help='regularization coefficient')
     parser.add_argument('--out_dir', type=str, default='./nucdpst_res',
                         help='Output directory path')
     parser.add_argument('--dyad_dist', type=int, default=80,
@@ -37,7 +40,7 @@ def parse_args():
                         help='min iterations in optimization step')
     parser.add_argument('--max_iter', type=int, default=500,
                         help='max iterations in optimization step')
-    parser.add_argument('--window_size', type=int, default=5000,
+    parser.add_argument('--window_size', type=int, default=3000,
                         help='size of scanning window')
     parser.add_argument('--step', type=int, default=None,
                         help='step of scanning')
@@ -98,8 +101,9 @@ def main():
     logger.info(f"Configuration:\n{pprint.pformat(vars(args), indent=2, width=120, sort_dicts=False)}")
 
     try:
+        error_probs = ErrorsProbs(args.errorpath, args.lamb)
         model = em_model.StochasticEMModel(
-            args.errorpath,
+            error_probs
             args.dyad_dist,
             args.min_iter,
             args.max_iter,

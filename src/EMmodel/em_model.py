@@ -52,7 +52,7 @@ class EMModel:
             errors = np.loadtxt(path, delimiter=",")
             errors = torch.from_numpy(errors).to(self.device)
         elif isinstance(path, np.ndarray):
-            errors = torch.from_numpy(errors).to(self.device)
+            errors = torch.from_numpy(path).to(self.device)
         elif isinstance(path, torch.Tensor):
             errors = path
         else:
@@ -64,7 +64,7 @@ class EMModel:
         return errors
 
     def __validate_cords(self, cords):
-        return cords.to(self.device)
+        return torch.from_numpy(cords).to(self.device)
 
     def __validate_dyads(self, dyads=None):
         if dyads is None:

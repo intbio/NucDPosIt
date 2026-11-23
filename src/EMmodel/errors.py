@@ -4,7 +4,7 @@ import pandas as pd
 
 
 class ErrorsProbs:
-    def __init__(self, handler, lamb, *args, **kwargs):
+    def __init__(self, handler, lamb=None, *args, **kwargs):
         self.__errors = self.load_errors(handler, lamb)
 
     def __len__(self):
@@ -19,7 +19,7 @@ class ErrorsProbs:
             if lamb is None:
                 raise ValueError("regularization coefficient lambda is None")
             errors_df = pd.read_csv(handler)
-            q = errors_df.query("lamb == @lamb")
+            q = errors_df[errors_df["lamb"] == lamb]
             if len(q) == 0:
                 raise ValueError(f"regularization coefficient lambda={lamb} is not found in {handler}")
             if len(q) != 1:
